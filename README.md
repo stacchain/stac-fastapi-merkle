@@ -41,7 +41,7 @@ pip install -e .
 
 ```python
 from fastapi import FastAPI
-from stac_fastapi_merkle.extension import MerkleVerificationExtension
+from stac_fastapi_merkle import MerkleVerificationExtension
 from stac_fastapi.sfeos.client import SFEOSClient
 
 app = FastAPI()
@@ -52,7 +52,22 @@ merkle_ext = MerkleVerificationExtension(client=client)
 merkle_ext.register(app)
 ```
 
-### 2. Verify an Item
+### 2. Optional: Configure Trusted Domains
+
+For enhanced security, restrict proof URLs to specific domains:
+
+```python
+# Only allow proofs from your S3 bucket
+merkle_ext = MerkleVerificationExtension(
+    client=client,
+    trusted_domains=["s3.amazonaws.com", "proofs.example.com"]
+)
+merkle_ext.register(app)
+```
+
+If `trusted_domains` is empty (default), the extension allows any non-private IP address.
+
+### 3. Verify an Item
 
 Make a GET request to verify an item's integrity:
 
@@ -275,10 +290,18 @@ This ensures compatibility with any stac-fastapi backend without requiring backe
 
 ### Security Considerations
 
-- **Canonicalization**: JCS ensures deterministic JSON representation
-- **Double Hashing**: Prevents length-extension attacks on SHA256
+- **Canonicalization**: JCS (RFC 8785) ensures deterministic JSON representation
+- **Double Hashing**: SHA256(SHA256(x)) prevents length-extension attacks
 - **Proof Validation**: Traverses the entire Merkle path to verify integrity
 - **Circular Logic Prevention**: Excludes `merkle:object_hash` from item before hashing
+- **SSRF Protection**: Validates proof URLs to prevent access to private IP ranges and localhost
+- **Trusted Domain Whitelist**: Optional configuration to restrict proof URLs to specific domains
+
+### Performance Optimizations
+
+- **Non-Blocking Hashing**: CPU-intensive canonicalization and hashing operations run in a thread pool to prevent blocking the event loop
+- **Async Throughout**: Full async/await support for high-concurrency verification
+- **Efficient Proof Traversal**: Merkle path traversal is optimized for typical tree depths (10-30 levels)
 
 ## Conformance
 
